@@ -2,6 +2,7 @@ print("WTVProxy by TendingStream73 is starting up...")
 from configparser import ConfigParser
 from socket import AF_INET, SOCK_STREAM, socket
 from threading import Thread
+import json
 try: import requests
 except ImportError:
     print("requests not found, installing...")
@@ -26,10 +27,12 @@ if cparse['Server']['Custom'] == 'no':
     print("Fetching server list from https://rcrms.ru/srvlist.json")
     srvlist = requests.get("https://rcrms.ru/srvlist.json").json()['servers']
     try:
-        srv_specs = srvlist[cparse['Server']['Name']]
-    except KeyError:
+        srv_specs = srvlist['servers'][cparse['Server']['Name']]
+    except Exception as e:
         print("Invalid server specified, check if name is valid")
         print("If server is local, check if valude Custom set to yes")
+        print(f"Python error: {e}")
+        exit(-1)
 else:
     print("Getting server info from config")
     srv_conf = cparse[cparse['Server']['Name']]
@@ -37,6 +40,8 @@ else:
 
 def handler(sock: socket):
     srv = socket(AF_INET, SOCK_STREAM)
+    if srv_specs.get("avaible", "yes") == "no":
+        sock.send(f"400 {srv_specs.get('not_avaible_text', 'Server is not public, contact server author for connection info')}\r\nContent-Type: text/html\r\nContent-Length: 0\r\n".encode())
     try: srv.connect((srv_specs['host'], int(srv_specs['port'])))
     except: sock.send(b"400 WTVProxy error: Cannot connect to server\r\nContent-Type: text/html\r\nContent-Length: 0\r\n");sock.close();return
     sock.settimeout(1)
@@ -49,7 +54,7 @@ def handler(sock: socket):
             try: sock.send(srv.recv(16384))
             except TimeoutError: 
                 tsrv+=1
-                if tsrv > 5:
+                if tsrv > 3:
                     raise Exception("a")
     except Exception as e:
         print(f"handler: Client/Server disconnected(err: {e}), cleaning up")
