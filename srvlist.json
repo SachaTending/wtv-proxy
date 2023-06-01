@@ -11,6 +11,10 @@
         "redialed": {
             "avaible": "no",
             "not_avaible_text": "Nice try! To continue, open config.ini to switch to hacktv(or other) server, if you REALLY want to connect to it, do something for webtv hacking community"
+        },
+        "tendtv": {
+            "host": "rcrms.ru",
+            "port": 1615
         }
     }
 }

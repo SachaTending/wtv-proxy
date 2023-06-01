@@ -10,6 +10,8 @@ except ImportError:
     pmain(['install', 'requests'])
     import requests
 
+replace_prereg: bool = False
+
 print("Parsing config...")
 cparse = ConfigParser()
 cparse.read("config.ini")
@@ -17,7 +19,7 @@ print(f"Config sections: {cparse.sections()}")
 
 if cparse.get("General", "Restore",fallback="yes") == "yes":
     print("(RE)Creating config")
-    cparse['Server'] = {'Custom': 'no', 'Name': 'hacktv'}
+    cparse['Server'] = {'Custom': 'no', 'Name': 'hacktv', 'localhost': 'yes'}
     cparse['General'] = {'Restore': 'no'}
     print("Saving config...")
     cparse.write(open("config.ini", "w"))
@@ -38,6 +40,16 @@ else:
     srv_conf = cparse[cparse['Server']['Name']]
     srv_specs = {'host': srv_conf['Host'], 'port': int(srv_conf['Port'])}
 
+print("Checking if server capable")
+sock = socket(AF_INET, SOCK_STREAM)
+sock.connect((srv_specs['host'], int(srv_specs['port'])))
+sock.send(b"GET wtv-proxy:/supports")
+out = sock.recv(1024)
+sock.close()
+if out == b'yes':
+    print("Server supports wtv-proxy")
+    replace_prereg = True
+
 def handler(sock: socket):
     srv = socket(AF_INET, SOCK_STREAM)
     if srv_specs.get("avaible", "yes") == "no":
@@ -49,9 +61,17 @@ def handler(sock: socket):
     tsrv = 0
     try:
         while True:
-            try: srv.send(sock.recv(16384))
+            try: 
+                data: bytes = sock.recv(16384)
+                if replace_prereg:
+                    data = data.decode().replace("wtv-1800:/preregister", "wtv-proxy:/preregister").encode()
+                srv.send(data)
             except TimeoutError: pass
-            try: sock.send(srv.recv(16384))
+            try: 
+                data = srv.recv(16384)
+                if cparse['Server']['localhost'] == 'yes':
+                    data = data.decode().replace("10.0.0.1", "127.0.0.1").encode()
+                sock.send(data)
             except TimeoutError: 
                 tsrv+=1
                 if tsrv > 3:
